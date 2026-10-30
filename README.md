@@ -7,10 +7,12 @@ An optional, signed KAI Core plugin that connects trusted clients to your instal
 1. Install Remote Access from Core's Plugins section, or install the signed `.kaiplugin` file from this repository's release. Review the native permission prompt.
 2. In Core, install a local model and choose an online privacy mode. Local-Only blocks remote access.
 3. Open Remote Access, name a key, and choose **Create and copy key**. Core asks for approval and copies the secret to the system clipboard once. Paste it into a trusted client's API key setting. The plugin renderer never receives the secret. Core clears the clipboard after 60 seconds if it still contains that key.
-4. Choose **Review and start**. Review the relay disclosure, then wait for the connection and base URL. Copy the base URL into the client's OpenAI-compatible provider setting, and select an installed model's API name.
-5. Keep the plugin window open. **Stop access**, closing the plugin, disabling it, quitting Core, and switching Core to Local-Only end the session. Access never resumes automatically.
+4. Turn the **Remote access** switch on. Review the relay disclosure, then wait for the connection and base URL. Copy the base URL into the client's OpenAI-compatible provider setting, and select an installed model's API name.
+5. Keep the plugin window open. Turning **Remote access** off, closing the plugin, disabling it, quitting Core, and switching Core to Local-Only end the session. Access never resumes automatically.
 
 The relay is fixed to `https://koinosai.com`. It receives client API keys, prompts and responses; use it only with clients and relay operators you trust. No connection to the hosted relay was made to test or publish this version. Automated tests validate its existing hello/poll/respond protocol against a synthetic loopback relay. If the hosted relay is unavailable, the plugin reports the offline state and retries until stopped. Deployment of this plugin does not provision or change the hosted relay.
+
+The window follows the original Local API layout: API keys, the Remote access switch and base URL, then client setup. It uses the same light KAI colors, controls and scrollbars as Core. Messages can be dismissed with the X, and background refreshes preserve the selected model and key controls.
 
 ## Supported client API
 

@@ -3,7 +3,7 @@
   "apiVersion": 2,
   "id": "kai.remote-access",
   "name": "KAI Remote Access",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Connect trusted clients to your local models through a reviewed, authenticated relay session.",
   "entry": "index.html",
   "permissions": [
