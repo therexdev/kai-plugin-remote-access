@@ -9,7 +9,7 @@ test("original API screen retains endpoint, privacy, keys, budgets and the remot
 });
 test("native broker owns network, credentials and key creation; all original controls are wired", () => {
   new vm.Script(js); assert.equal(manifest.id, "kai.remote-access");
-  assert.deepEqual(manifest.permissions, ["remote-access.read", "remote-access.control", "remote-access.keys", "remote-access.features", "desktop.preferences"]);
+  assert.deepEqual(manifest.permissions, ["remote-access.read", "remote-access.control", "remote-access.keys", "desktop.preferences"]);
   assert.match(js, /window\.kai\.call\("remote\.api"/);
   assert.ok(!/fetch\(|eval\(|require\(|\.digest|remote\.token/.test(js));
   assert.match(html, /connect-src 'none'/);

@@ -1,5 +1,5 @@
-# 0.2.0
+# Remote Access 0.2.1
 
-Restores the original Koinos AI feature interface and native capabilities in a separately installed plugin. Uses the existing shared profile and saved data. Requires KAI Core 0.5.0 or later.
+Removes Optional sections, including the Koinos Node, Developer tools and Koinos Code controls, links and feature-management requests. These apps remain separately available through Core’s Apps sidebar and Plugins manager.
 
-Original layouts, controls and workflows replace the earlier reduced plugin screens. Feature-specific approvals, secure credential handling, privacy settings and native service cleanup remain enforced.
+Local API access, API keys, budgets, usage, privacy, language and the Remote Access switch are preserved. Requires Core 0.6.1 or newer; the package no longer requests the cross-feature management permission.
