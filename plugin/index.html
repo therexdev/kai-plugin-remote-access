@@ -4,12 +4,11 @@
           <p class="lede">Point any OpenAI SDK or tool at this machine. No cloud, no per-token bill.</p>
           <pre id="api-snippet" class="snippet"></pre>
           <h2>Network &amp; privacy</h2>
-          <p class="hint">Local-Only is the default: AI requests stay on this machine. Koinos Node and explicit wallet actions use the blockchain independently. Local-First and Network unlock the “Koinos Network” model — requests overflow to network providers through the scheduler.
-            <b>Network requests run on other people's computers: the provider serving your request can read what it contains</b> — nothing is stored by the serving path, but treat anything sent off this machine as visible to that provider.</p>
+          <p class="hint">Local-Only keeps the remote relay off. Local-First or Network allows you to enable it. These are shared AI privacy settings. Remote Access itself serves only installed local models; it cannot spend credits or call wallets, Brain, connected accounts or other plugin services.</p>
           <div class="form-row">
             <select id="privacy-pick">
               <option value="local-only">Local-Only (AI requests stay on this machine)</option>
-              <option value="local-first">Local-First (local when possible, network when needed — first 25k tokens/epoch free)</option>
+              <option value="local-first">Local-First</option>
               <option value="network">Network</option>
             </select>
           </div>
@@ -18,7 +17,7 @@
             <h2>API keys</h2>
             <button id="btn-new-key" class="primary small">Create key</button>
           </div>
-          <p class="hint">Without keys, apps on this computer connect freely. Creating the first key requires every API call to present one — the built-in chat keeps working either way.</p>
+          <p class="hint">Every request requires a Remote Access API key, including requests from this computer. Keys and usage belong to this plugin. Local inference has no network charge; saved monthly dollar budgets do not spend or purchase credits.</p>
           <div id="new-key-reveal" hidden>
             <p class="hint strong">Copy it now — it is shown only once:</p>
             <pre class="snippet" id="new-key-value"></pre>

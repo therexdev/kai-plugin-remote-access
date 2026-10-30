@@ -1,17 +1,33 @@
 # KAI Remote Access
 
-The original Local API and Remote Access screen, installed as a KAI Core plugin. It uses the original API-key manager and RemoteAccess relay implementation.
+Remote Access owns its local API server, API keys, usage counters, monthly budget settings and optional relay connection. The UI retains the endpoint example, privacy control, key list, one-time key creation, budgets, usage, revocation and remote switch. No optional Node/Developer/Code management controls are included.
 
-The screen includes the local OpenAI-compatible endpoint and example, network/privacy selector, existing API keys, one-time key creation, monthly network budgets, token/cost usage, key revocation and the original remote-access switch and connection address.
+Version 0.3 uses fresh plugin-owned storage. Old gateway keys and relay tokens are not imported or modified. Core supplies only public model inference, privacy controls, preferences, storage and action reviews through Foundation API v1.
 
-Remote Access 0.2.1 removes the Optional sections panel and its Koinos Node, Developer tools and Koinos Code switches, links and management calls. Those apps are accessed through Core’s Apps sidebar and Plugins manager. Remote Access no longer requests permission to control other features. Requires Core 0.6.1 or newer.
+## Access
 
-The original offline language engine, catalogs and language styles are bundled unchanged. The screen reads only the saved Core interface-language preference when opening; keys, addresses, model aliases and user-entered key names remain unchanged by translation.
+The plugin starts an OpenAI-compatible HTTP listener on `127.0.0.1`. Its current address appears in the screen. Every request requires one of this plugin's API keys, including requests from the same computer. Only key digests are stored; the full secret is shown once.
 
-Remote traffic uses the original authenticated `/v1/` gateway, including its real streaming, model routing and per-key budgets. The relay never receives access to `/core/`, the desktop control plane, wallet keys or plugin APIs. Local-Only prevents remote activation. Enabling remote access requires a native review and at least one API key; revoking the final key stops access.
+Only `GET /v1/models`, `POST /v1/chat/completions` and `POST /v1/embeddings` are available. The model list includes installed, ready local models. Chat accepts bounded text messages and supports live streaming. Other routes, tools, private provider models, browser-origin requests and plugin service calls are rejected. Core wallets, Brain, connected accounts and other apps are never remote endpoints.
 
-Switching away from the app or closing Core to its tray leaves an enabled session running while Core remains open. Stop, Local-Only, plugin disable/uninstall and Core shutdown end the session. The original relay identity and saved gateway API keys remain in the shared profile. Earlier plugin-specific keys remain preserved, and the earlier limited remote API remains available for compatibility; the restored screen manages the original gateway keys.
+Local inference has zero network charge. Actual returned token usage is recorded. Dollar budgets remain visible and stored, but this local-only API cannot purchase or spend credits; enabling the relay does not grant paid network inference.
 
-The renderer uses only reviewed `window.kai.call` operations. Stored key digests, relay identity tokens and unrelated saved settings are not returned to it. A newly created API key is shown once, matching the original screen. Corrupt or externally changed settings are preserved for recovery.
+The remote switch requires a key, Local-First or Network privacy mode, and an explicit review. Prompts and replies pass through koinosai.com. Page changes and KAI's tray state leave the plugin running. Stop, Local-Only, disabling/removing the plugin and quitting KAI stop the relay; revoking a key cancels active inference. A previously enabled relay can resume at startup when privacy permits.
 
-Run `npm test` for the renderer contract checks. Core provides native service, authentication, storage, privacy, streaming and desktop integration coverage. Releases require the matching Core feature APIs and an immutable signed package from the existing publisher.
+## Trust and development
+
+Installing the native service grants **full computer and application access**. Sandboxing the renderer does not sandbox the native service. Install only trusted native plugins. This plugin deliberately exposes only the model endpoints to remote clients.
+
+There are no third-party runtime dependencies or client install scripts. `npm test` covers credentials, local-only model filtering, forbidden routes, browser requests, stream/token accounting, privacy gates, revocation and teardown after Core revokes its API. `node scripts/verify-package.js` verifies a signed package against checked-in source.
+
+Requires Foundation's schema 2 / API 3 runtime. Live public relay operation is a separate integration check; the tests use a synthetic relay and real loopback HTTP server.
+
+## Foundation package publication
+
+Requires KAI Core **0.7.0 or later**, manifest schema 2/API 3 and native API v1. Source lives in `plugin/`, including its service and all runtime dependencies. Runtime installation never runs npm or dependency hooks.
+
+Before signing, install any author dependencies with `npm ci --ignore-scripts` when this repository has a lockfile, run `npm run build --if-present`, then `node scripts/verify-package.js --source` and `npm test`. The source-only check uses a temporary in-memory test signature; it does not claim a publisher release was signed.
+
+Pack the complete plugin using Core's `scripts/core/pack-plugin.js`, keeping the publisher private key outside every repository. Place the new immutable signed asset at `dist/<repository-name>-<manifest-version>.kaiplugin`, then run `node scripts/verify-package.js`. The release verifier checks the actual publisher signature and exact source/assets/dependency contents against the same package rules as Core. Its standalone format snapshot and SHA-256 provenance are under `scripts/package-format-v3*`; it never imports or executes submitted plugin code.
+
+CI tests source on `foundation-v1`, pull requests and `main` on Windows, macOS and Linux. It checks any signed asset present for the current version. Publication runs only from `main`, only when that exact signed asset exists, and only after every check passes. Existing release assets must match byte-for-byte and are never overwritten. Branch builds cannot publish releases. Native device/integration checks remain necessary before a release; unit tests do not replace them.

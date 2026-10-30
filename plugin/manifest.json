@@ -1,15 +1,24 @@
 {
-  "schema": 1,
-  "apiVersion": 2,
+  "schema": 2,
+  "apiVersion": 3,
   "id": "kai.remote-access",
   "name": "KAI Remote Access",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "The original Local API workspace with API keys, budgets, usage, privacy controls and optional remote relay access.",
   "entry": "index.html",
   "permissions": [
-    "remote-access.read",
-    "remote-access.control",
-    "remote-access.keys",
+    "native.execute",
+    "models.read",
+    "inference.local",
+    "storage.read",
+    "storage.write",
+    "network.status",
+    "network.fetch",
+    "network.configure",
     "desktop.preferences"
-  ]
+  ],
+  "runtime": "native",
+  "service": "service/index.js",
+  "provides": [],
+  "consumes": []
 }

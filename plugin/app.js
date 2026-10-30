@@ -22,7 +22,7 @@ function paintRemote(remote) {
 function paint(state) {
   latest = state;
   const alias = state.models.find(a => a.status === "ready")?.alias || state.models[0]?.alias || "dev-tiny";
-  $("api-snippet").textContent = ["from openai import OpenAI", "", `client = OpenAI(base_url="${state.localBase}/v1", api_key="${state.required ? "YOUR_API_KEY" : "none-needed-yet"}")`, "resp = client.chat.completions.create(", `    model="${alias}",`, '    messages=[{"role": "user", "content": "Hello!"}],', ")"].join("\n");
+  $("api-snippet").textContent = ["from openai import OpenAI", "", `client = OpenAI(base_url="${state.localBase}/v1", api_key="${state.required ? "YOUR_API_KEY" : "CREATE_AN_API_KEY"}")`, "resp = client.chat.completions.create(", `    model="${alias}",`, '    messages=[{"role": "user", "content": "Hello!"}],', ")"].join("\n");
   if (document.activeElement !== $("privacy-pick")) $("privacy-pick").value = state.privacyMode;
   paintRemote(state.remote);
   if ($("key-list").querySelector(".budget-edit")) return;

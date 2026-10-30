@@ -1,5 +1,7 @@
-# Remote Access 0.2.1
+# Remote Access 0.3.0 — plugin-owned foundation architecture
 
-Removes Optional sections, including the Koinos Node, Developer tools and Koinos Code controls, links and feature-management requests. These apps remain separately available through Core’s Apps sidebar and Plugins manager.
+API credentials, usage, local listener and relay now belong entirely to this plugin. Core supplies documented public model, privacy, preference and storage services.
 
-Local API access, API keys, budgets, usage, privacy, language and the Remote Access switch are preserved. Requires Core 0.6.1 or newer; the package no longer requests the cross-feature management permission.
+Fresh plugin storage replaces shared legacy credentials. Every local or remote API request requires a key. Only installed local model listing, bounded text chat and embeddings are available; no private app routes, tools, wallet operations or paid inference are exposed.
+
+Requires Foundation's schema 2 / API 3 runtime and explicit native-code trust (full computer access). No client dependency installation runs.
