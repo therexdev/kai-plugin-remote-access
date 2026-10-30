@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "apiVersion": 2,
+  "id": "kai.remote-access",
+  "name": "KAI Remote Access",
+  "version": "0.1.0",
+  "description": "Connect trusted clients to your local models through a reviewed, authenticated relay session.",
+  "entry": "index.html",
+  "permissions": [
+    "remote-access.read",
+    "remote-access.control",
+    "remote-access.keys"
+  ]
+}
