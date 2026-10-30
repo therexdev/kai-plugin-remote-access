@@ -1,16 +1,96 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"><title>KAI Remote Access</title><link rel="stylesheet" href="kai-theme.css"><link rel="stylesheet" href="style.css"></head><body>
-<header class="workspace-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12H3M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 3c-5 5-5 13 0 18 5-5 5-13 0-18"/></svg><h1>Remote access</h1><span class="workspace-caption" id="privacy">Connecting to Core</span></header>
-<main><div class="api-card">
-<div class="page-heading"><h2>Your OpenAI-compatible API</h2><p class="lead">Point a trusted app at this computer’s local models.</p></div>
-<div id="notice" role="status" aria-live="polite" hidden></div>
-<section class="api-section" aria-labelledby="keys-title"><div class="keys-head"><h3 id="keys-title">API keys</h3></div><p class="hint">Create a key for each trusted client. A key can list installed models and request local text inference while Remote access is on.</p>
-<form class="form-row" id="key-form"><label for="key-name" class="sr-only">Key name</label><input id="key-name" maxlength="80" required placeholder="Key name, e.g. My laptop"><button class="primary" id="key-create" type="submit">Create and copy key</button></form><p class="hint">Core copies the secret once. Save it in your client within 60 seconds; the plugin never receives it.</p><div id="keys" class="key-list"></div>
-</section>
-<section class="api-section" aria-labelledby="access-title"><div class="keys-head"><h3 id="access-title">Remote access</h3><div class="switch-controls"><button class="switch" id="start" type="button" role="switch" aria-checked="false" aria-label="Remote access" title="Review and start Remote access"><span class="switch-track"><span class="switch-thumb"></span></span><span>Off</span></button><button class="switch" id="stop" type="button" role="switch" aria-checked="true" aria-label="Remote access" title="Stop access" disabled hidden><span class="switch-track"><span class="switch-thumb"></span></span><span>On</span></button></div></div>
-<p class="hint">Use your API from anywhere — a phone, a server, another computer. KAI keeps an outbound connection to koinosai.com, with no router setup. Requests are answered by this computer. An enabled API key is required.</p><p class="hint">Remote Access never starts automatically. Closing it or switching Core to Local-Only stops access.</p>
-<div class="connection-status"><span id="state" class="pill">Off</span><div><strong id="headline">Remote access is off.</strong><p class="hint" id="connection-detail">Create or allow a key, then review the connection before starting.</p></div><button id="refresh" type="button" title="Check remote connection">Check connection</button></div>
-<div class="endpoint"><label for="endpoint">OpenAI-compatible base URL<input id="endpoint" readonly placeholder="Appears after connecting"></label><button id="copy-endpoint" type="button" disabled>Copy URL</button></div><p class="hint" id="counts">No requests served this session.</p><p class="relay-note">The relay at koinosai.com receives client API keys, prompts and responses. Give keys only to trusted clients.</p>
-</section>
-<section class="api-section" aria-labelledby="client-title"><h3 id="client-title">Connect a client</h3><p class="hint">Use the base URL above in your client’s OpenAI-compatible provider settings and paste the key you created. Select one of the available local models.</p><label for="models">Available local models</label><select id="models"></select><p class="hint" id="model-note"></p><details class="advanced"><summary>Supported requests</summary><p class="hint">Text chat only. Up to 16,000 characters of conversation and 4,096 output tokens. Streaming clients receive the completed answer in an SSE response.</p></details></section>
-<details class="api-section advanced"><summary>Existing API keys and address settings</summary><div class="advanced-content"><h3>Keep existing clients working</h3><p class="hint">Old gateway keys remain saved. They gain remote access only after you explicitly allow them here. Removing their remote access preserves their original local gateway permissions.</p><div id="legacy-keys" class="key-list"></div><hr><h3>Replace your remote address</h3><p class="hint">Keep your existing relay identity by default. Replacing it stops access and makes old base URLs invalid; keys stay saved.</p><button class="danger" id="rotate" type="button">Review address replacement</button></div></details>
-</div></main><script src="kai-notices.js"></script><script src="app.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Remote Access</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="product-experience.css"><link rel="stylesheet" href="plugin.css"><link rel="stylesheet" href="language.css"></head><body><main><section id="view-api" class="view">
+        <div class="api-card">
+          <h1>Your local OpenAI-compatible API</h1>
+          <p class="lede">Point any OpenAI SDK or tool at this machine. No cloud, no per-token bill.</p>
+          <pre id="api-snippet" class="snippet"></pre>
+          <h2>Network &amp; privacy</h2>
+          <p class="hint">Local-Only is the default: AI requests stay on this machine. Koinos Node and explicit wallet actions use the blockchain independently. Local-First and Network unlock the “Koinos Network” model — requests overflow to network providers through the scheduler.
+            <b>Network requests run on other people's computers: the provider serving your request can read what it contains</b> — nothing is stored by the serving path, but treat anything sent off this machine as visible to that provider.</p>
+          <div class="form-row">
+            <select id="privacy-pick">
+              <option value="local-only">Local-Only (AI requests stay on this machine)</option>
+              <option value="local-first">Local-First (local when possible, network when needed — first 25k tokens/epoch free)</option>
+              <option value="network">Network</option>
+            </select>
+          </div>
+
+          <div class="keys-head">
+            <h2>API keys</h2>
+            <button id="btn-new-key" class="primary small">Create key</button>
+          </div>
+          <p class="hint">Without keys, apps on this computer connect freely. Creating the first key requires every API call to present one — the built-in chat keeps working either way.</p>
+          <div id="new-key-reveal" hidden>
+            <p class="hint strong">Copy it now — it is shown only once:</p>
+            <pre class="snippet" id="new-key-value"></pre>
+          </div>
+          <ul id="key-list"></ul>
+
+          <div class="keys-head">
+            <h2>Remote access</h2>
+            <button id="btn-remote-toggle" class="switch" role="switch" aria-checked="false" aria-label="Remote access">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </button>
+          </div>
+          <p class="hint">Use your API from anywhere — a phone, a server, another computer. The app keeps an
+            outbound connection to koinosai.com (nothing to install, no router setup) and your API key works
+            at the address below. Requests are answered by <b>this computer</b>, so it works while the app is
+            running. An API key is required — without one the switch refuses, so your API is never open to
+            the internet. Heads up: remote traffic passes through koinosai.com on its way here.</p>
+          <div class="remote-notice" id="remote-notice" hidden><p class="hint strong" id="remote-error" role="status"></p><button id="remote-close" aria-label="Dismiss message">×</button></div>
+          <div id="remote-info" hidden>
+            <pre class="snippet" id="remote-base"></pre>
+            <p class="hint" id="remote-state"></p>
+          </div>
+
+          <h2>Optional sections</h2>
+          <p class="hint">These optional workspaces open in their own windows. Install or manage their plugins here; your saved work stays in the same profile.</p>
+
+          <div class="koinos-toggle-row">
+            <div>
+              <b>Run Koinos Node</b>
+              <div class="hint" id="koinos-toggle-hint">
+                Runs a real Koinos node on this machine, with a wallet, funding, swaps and
+                block-production rewards. Uses your existing Koinos AI wallet. Node networking is independent of AI Privacy; Local-Only can stay on.
+              </div>
+            </div>
+            <button id="btn-koinos-toggle" class="switch" role="switch" aria-checked="false" aria-label="Run Koinos node">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </button>
+          </div>
+          <p class="hint" id="optional-node-status" role="status"></p><div class="form-row"><button class="linklike" id="optional-node-open" hidden>Open</button><button class="linklike" id="optional-node-manage">Manage plugin</button></div>
+
+
+          <div class="koinos-toggle-row">
+            <div>
+              <b>Developer tools</b>
+              <div class="hint">
+                Adds a <b>Developer Tools</b> section to the sidebar: build your own multi-agent
+                systems, watch them run in a live playground, define custom pipelines, and
+                benchmark your model. Everything there obeys the same privacy and permission
+                rules as the rest of the app.
+              </div>
+            </div>
+            <button id="btn-dev-toggle" class="switch" role="switch" aria-checked="false" aria-label="Developer tools">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </button>
+          </div>
+          <p class="hint" id="optional-developer-status" role="status"></p><div class="form-row"><button class="linklike" id="optional-developer-open" hidden>Open</button><button class="linklike" id="optional-developer-manage">Manage plugin</button></div>
+          <div class="koinos-toggle-row">
+            <div>
+              <b>Koinos Code</b>
+              <div class="hint">
+                Adds <b>Koinos Code</b> to the sidebar: the coding agent, working on folders you
+                choose. Worth knowing exactly what it can do — inside a project you add, it can
+                write files and run commands as you. It never does either without showing you the
+                change or the exact command first and waiting for your yes, and it never touches
+                anything outside that folder.
+              </div>
+            </div>
+            <button id="btn-code-toggle" class="switch" role="switch" aria-checked="false" aria-label="Koinos Code">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </button>
+          </div>
+          <p class="hint" id="optional-code-status" role="status"></p><div class="form-row"><button class="linklike" id="optional-code-open" hidden>Open</button><button class="linklike" id="optional-code-manage">Manage plugin</button></div>
+<div class="remote-notice" id="optional-notice" hidden><p class="hint strong" id="optional-error" role="status"></p><button id="optional-close" aria-label="Dismiss message">×</button></div>
+        </div>
+</section></main><script src="locales/catalogs.js"></script><script src="i18n.js"></script><script src="language-bootstrap.js"></script><script src="app.js"></script><script src="optional-features.js"></script></body></html>

@@ -1,17 +1,66 @@
 "use strict";
-const $=id=>document.getElementById(id);let state=null,busy=false,keysSignature="",legacySignature="",modelsSignature="";
-const banner=window.KaiPluginNotice.attach($("notice"),{focusTarget:()=>$("refresh")});
-let backgroundFailure=false;
-function notice(message,error=false,background=false){backgroundFailure=background;banner.show(message,{error,force:!background});}
-function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
-function keyCard(key,legacy=false){const card=node("div",undefined,"card spread"),info=node("div");info.append(node("h3",key.name));info.append(node("small",legacy?(key.enabled?"Allowed for remote access":"Not allowed remotely"):"Remote text inference only"));const button=node("button",legacy?(key.enabled?"Remove remote access":"Allow remotely"):"Revoke",legacy?"":"danger");button.disabled=busy;button.addEventListener("click",()=>act(legacy?"remote.keyAdopt":"remote.keyRevoke",legacy?{id:key.id,enabled:!key.enabled}:{id:key.id},legacy?"Remote key permissions updated. Start access again when ready.":"Key revoked. Remote Access stopped."));card.append(info,button);return card;}
-function render(){if(!state)return;$("privacy").textContent=state.privacyMode;$("state").textContent=state.state;$("state").classList.toggle("connected",state.state==="connected");$("headline").textContent=({off:"Remote access is off.",connecting:"Connecting to your relay…",connected:"Your local models are available.",offline:"The relay is currently unavailable."})[state.state]||"Remote Access";$("connection-detail").textContent=state.state==="offline"?"KAI will retry while this window stays open. You can stop at any time.":state.enabled?"Only holders of enabled API keys can use the endpoints shown here.":"Create or allow a key, then review the connection before starting.";$("endpoint").value=state.base||"";$("start").disabled=busy||state.enabled;$("start").hidden=!!state.enabled;$("stop").hidden=!state.enabled;$("stop").disabled=!state.enabled;$("copy-endpoint").disabled=busy||!state.base;$("key-create").disabled=busy;$("rotate").disabled=busy;$("refresh").disabled=busy;$("counts").textContent=`${state.counts.served} served · ${state.counts.rejected} rejected this session`;
-const nextKeys=JSON.stringify([state.keys,busy]);if(nextKeys!==keysSignature){keysSignature=nextKeys;const keys=$("keys");keys.replaceChildren(...state.keys.map(k=>keyCard(k)));if(!state.keys.length)keys.append(node("p","No remote keys yet.","empty"));}
-const nextLegacy=JSON.stringify([state.legacyKeys,busy]);if(nextLegacy!==legacySignature){legacySignature=nextLegacy;const legacy=$("legacy-keys");legacy.replaceChildren(...state.legacyKeys.map(k=>keyCard(k,true)));if(!state.legacyKeys.length)legacy.append(node("p","No existing gateway keys were found.","empty"));}
-const nextModels=JSON.stringify(state.models);if(nextModels!==modelsSignature){modelsSignature=nextModels;const selected=$("models").value;$("models").replaceChildren(...state.models.map(m=>{const el=node("option",m.label||m.alias);el.value=m.alias;return el;}));if(state.models.some(m=>m.alias===selected))$("models").value=selected;}
-$("model-note").textContent=state.models.length?"Use the selected model’s API name: "+$("models").value:"Install a local model from Core’s Models section before starting.";}
-
-async function refresh(){state=await window.kai.call("remote.status",{});render();if(backgroundFailure){banner.clear();backgroundFailure=false;}}
-async function act(method,input={},success){if(busy)return;busy=true;banner.clear();render();try{const result=await window.kai.call(method,input);if(result.cancelled)notice("Canceled. No change was made.");else if(success)notice(success);await refresh();}catch(error){notice(error.message||"This action could not complete.",true);}finally{busy=false;render();}}
-$("refresh").addEventListener("click",()=>act("remote.status"));$("start").addEventListener("click",()=>act("remote.start",{},"Connecting. The base URL appears after the relay confirms your address."));$("stop").addEventListener("click",async()=>{try{await window.kai.call("remote.stop",{});await refresh();notice("Remote Access stopped.");}catch(e){notice(e.message,true);}});$("rotate").addEventListener("click",()=>act("remote.rotate",{},"Address identity replaced. Start access again to obtain your new URL."));$("copy-endpoint").addEventListener("click",()=>act("remote.copyEndpoint",{},"Base URL copied."));$("key-form").addEventListener("submit",event=>{event.preventDefault();act("remote.keyCreate",{name:$("key-name").value.trim()},"Key copied by Core. Paste it into your trusted client now; the clipboard clears after 60 seconds if unchanged.");});$("models").addEventListener("change",()=>{$("model-note").textContent="Use this model’s API name: "+$("models").value;});
-refresh().catch(e=>notice(e.message,true,true));setInterval(()=>{if(!busy)refresh().catch(e=>notice(e.message,true,true));},3000);
+// Original Local API view: the gateway key list, budgets and one remote toggle.
+const $ = id => document.getElementById(id);
+let pending = false, latest = null;
+const call = input => window.kai.call("remote.api", input);
+function error(message) { $("remote-error").textContent = String(message); $("remote-notice").hidden = !message; }
+$("remote-close").onclick = () => error("");
+async function run(input) {
+  if (pending) return;
+  pending = true; error("");
+  try { return await call(input); }
+  catch (e) { error(e.message || "The action could not finish."); }
+  finally { pending = false; }
+}
+function paintRemote(remote) {
+  $("btn-remote-toggle").setAttribute("aria-checked", String(remote.enabled === true));
+  $("remote-info").hidden = !remote.enabled;
+  $("remote-base").textContent = remote.base || "connecting…";
+  KaiI18n.setText($("remote-state"), remote.state === "connected" ? "Connected — this URL works from anywhere your key goes."
+    : remote.state === "offline" ? "Reconnecting to koinosai.com…" : "Connecting…");
+}
+function paint(state) {
+  latest = state;
+  const alias = state.models.find(a => a.status === "ready")?.alias || state.models[0]?.alias || "dev-tiny";
+  $("api-snippet").textContent = ["from openai import OpenAI", "", `client = OpenAI(base_url="${state.localBase}/v1", api_key="${state.required ? "YOUR_API_KEY" : "none-needed-yet"}")`, "resp = client.chat.completions.create(", `    model="${alias}",`, '    messages=[{"role": "user", "content": "Hello!"}],', ")"].join("\n");
+  if (document.activeElement !== $("privacy-pick")) $("privacy-pick").value = state.privacyMode;
+  paintRemote(state.remote);
+  if ($("key-list").querySelector(".budget-edit")) return;
+  $("key-list").replaceChildren();
+  for (const k of state.keys) {
+    const li = document.createElement("li"), left = document.createElement("span"), meta = document.createElement("span");
+    left.textContent = k.name + " "; meta.className = "meta";
+    const u = k.usage || { requests: 0, inTok: 0, outTok: 0, costUsd: "0" };
+    meta.textContent = `${u.requests} req · ${u.inTok.toLocaleString()} in / ${u.outTok.toLocaleString()} out tok · $${Number(u.costUsd).toFixed(4)}` + (k.budgetUsdMonthly != null ? ` / $${k.budgetUsdMonthly} budget` : "");
+    left.append(meta);
+    const budget = document.createElement("button"); budget.className = "linklike"; KaiI18n.setText(budget, "budget");
+    budget.onclick = () => {
+      if (li.querySelector(".budget-edit")) return;
+      const wrap = document.createElement("span"), input = document.createElement("input"), save = document.createElement("button"), cancel = document.createElement("button");
+      wrap.className = "budget-edit"; input.type = "number"; input.min = "0"; input.step = "0.01"; input.className = "small";
+      input.placeholder = "USD / month — empty = no limit"; input.value = k.budgetUsdMonthly ?? "";
+      save.className = "small primary"; KaiI18n.setText(save, "Save"); cancel.className = "small"; KaiI18n.setText(cancel, "Cancel");
+      const commit = async () => {
+        save.disabled = true; const value = input.value.trim();
+        const result = await run({ action: "budget", id: k.id, budgetUsdMonthly: value === "" ? null : Number(value) });
+        if (result) { wrap.remove(); paint(result); } else save.disabled = false;
+      };
+      save.onclick = commit; cancel.onclick = () => wrap.remove();
+      input.onkeydown = e => { if (e.key === "Enter") void commit(); if (e.key === "Escape") wrap.remove(); };
+      wrap.append(input, save, cancel); li.append(wrap); input.focus();
+    };
+    const revoke = document.createElement("button"); KaiI18n.setText(revoke, "revoke");
+    revoke.onclick = async () => { const result = await run({ action: "revoke", id: k.id }); if (result) paint(result); };
+    li.append(left, budget, revoke); $("key-list").append(li);
+  }
+}
+$("btn-new-key").onclick = async () => {
+  const result = await run({ action: "create", name: `key ${new Date().toISOString().slice(0, 10)}` });
+  if (result?.secret) { $("new-key-value").textContent = result.secret; $("new-key-reveal").hidden = false; }
+  await refresh();
+};
+$("btn-remote-toggle").onclick = async () => { const result = await run({ action: "toggle", enabled: !latest?.remote.enabled }); if (result) paint(result); };
+$("privacy-pick").onchange = async () => { const result = await run({ action: "privacy", privacyMode: $("privacy-pick").value }); if (result) paint(result); };
+async function refresh() { if (pending) return; try { paint(await call({ action: "status" })); } catch (e) { error(e.message); } }
+window.addEventListener("pagehide", () => { $("new-key-value").textContent = ""; });
+void window.kaiLanguageReady.then(refresh); setInterval(refresh, 3000);
