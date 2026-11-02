@@ -1,0 +1,54 @@
+{
+  "es": {
+    "/ ${0} budget": "/ presupuesto de ${0}",
+    "Connected — this URL works from anywhere your key goes.": "Conectado: esta URL funciona desde cualquier lugar donde uses tu clave.",
+    "Every request requires a Remote Access API key, including requests from this computer. Keys and usage belong to this plugin. Local inference has no network charge; saved monthly dollar budgets do not spend or purchase credits.": "Cada solicitud requiere una clave API de Acceso remoto, incluso desde este equipo. Las claves y el uso pertenecen a este plugin. La inferencia local no tiene coste de red; los presupuestos mensuales guardados en dólares no gastan ni compran créditos.",
+    "Local-Only keeps the remote relay off. Local-First or Network allows you to enable it. These are shared AI privacy settings. Remote Access itself serves only installed local models; it cannot spend credits or call wallets, Brain, connected accounts or other plugin services.": "Solo local mantiene el relé remoto desactivado. Local primero o Red permiten activarlo. Estos ajustes de privacidad de IA son compartidos. Acceso remoto solo sirve modelos locales instalados; no puede gastar créditos ni acceder a carteras, Brain, cuentas conectadas u otros servicios de plugins.",
+    "Reconnecting to koinosai.com…": "Reconectando con koinosai.com…",
+    "Remote Access": "Acceso remoto",
+    "The action could not finish.": "No se pudo completar la acción.",
+    "USD / month — empty = no limit": "USD al mes · vacío = sin límite",
+    "budget": "presupuesto",
+    "revoke": "revocar",
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitudes · {1} tokens de entrada / {2} de salida · ${3}{4}"
+  },
+  "pt-BR": {
+    "/ ${0} budget": "/ orçamento de ${0}",
+    "Connected — this URL works from anywhere your key goes.": "Conectado: esta URL funciona de qualquer lugar onde você use sua chave.",
+    "Every request requires a Remote Access API key, including requests from this computer. Keys and usage belong to this plugin. Local inference has no network charge; saved monthly dollar budgets do not spend or purchase credits.": "Toda solicitação exige uma chave API de Acesso remoto, inclusive deste computador. As chaves e o uso pertencem a este plugin. A inferência local não tem cobrança de rede; orçamentos mensais salvos em dólares não gastam nem compram créditos.",
+    "Local-Only keeps the remote relay off. Local-First or Network allows you to enable it. These are shared AI privacy settings. Remote Access itself serves only installed local models; it cannot spend credits or call wallets, Brain, connected accounts or other plugin services.": "Somente local mantém a retransmissão remota desativada. Local primeiro ou Rede permitem ativá-la. Essas configurações de privacidade de IA são compartilhadas. O Acesso remoto oferece apenas modelos locais instalados; não pode gastar créditos nem acessar carteiras, Brain, contas conectadas ou outros serviços de plugins.",
+    "Reconnecting to koinosai.com…": "Reconectando ao koinosai.com…",
+    "Remote Access": "Acesso remoto",
+    "The action could not finish.": "Não foi possível concluir a ação.",
+    "USD / month — empty = no limit": "USD por mês · vazio = sem limite",
+    "budget": "orçamento",
+    "revoke": "revogar",
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitações · {1} tokens de entrada / {2} de saída · ${3}{4}"
+  },
+  "fr": {
+    "/ ${0} budget": "/ budget de ${0}",
+    "Connected — this URL works from anywhere your key goes.": "Connecté : cette URL fonctionne partout où vous utilisez votre clé.",
+    "Every request requires a Remote Access API key, including requests from this computer. Keys and usage belong to this plugin. Local inference has no network charge; saved monthly dollar budgets do not spend or purchase credits.": "Chaque requête nécessite une clé API d’accès distant, même depuis cet ordinateur. Les clés et l’utilisation appartiennent à ce plugin. L’inférence locale n’entraîne aucun frais réseau ; les budgets mensuels enregistrés en dollars ne dépensent ni n’achètent de crédits.",
+    "Local-Only keeps the remote relay off. Local-First or Network allows you to enable it. These are shared AI privacy settings. Remote Access itself serves only installed local models; it cannot spend credits or call wallets, Brain, connected accounts or other plugin services.": "Local uniquement désactive le relais distant. Priorité au local ou Réseau permettent de l’activer. Ces paramètres de confidentialité IA sont partagés. L’accès distant sert uniquement les modèles locaux installés ; il ne peut ni dépenser des crédits ni accéder aux portefeuilles, à Brain, aux comptes connectés ou aux services d’autres plugins.",
+    "Reconnecting to koinosai.com…": "Reconnexion à koinosai.com…",
+    "Remote Access": "Accès à distance",
+    "The action could not finish.": "L’action n’a pas pu aboutir.",
+    "USD / month — empty = no limit": "USD par mois · vide = sans limite",
+    "budget": "budget",
+    "revoke": "révoquer",
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} requêtes · {1} jetons en entrée / {2} en sortie · ${3}{4}"
+  },
+  "de": {
+    "/ ${0} budget": "/ Budget ${0}",
+    "Connected — this URL works from anywhere your key goes.": "Verbunden – diese URL funktioniert überall, wo du deinen Schlüssel verwendest.",
+    "Every request requires a Remote Access API key, including requests from this computer. Keys and usage belong to this plugin. Local inference has no network charge; saved monthly dollar budgets do not spend or purchase credits.": "Jede Anfrage benötigt einen Fernzugriffs-API-Schlüssel, auch von diesem Computer. Schlüssel und Nutzung gehören diesem Plugin. Lokale Inferenz verursacht keine Netzwerkgebühren; gespeicherte monatliche Dollarbudgets geben keine Credits aus und kaufen keine.",
+    "Local-Only keeps the remote relay off. Local-First or Network allows you to enable it. These are shared AI privacy settings. Remote Access itself serves only installed local models; it cannot spend credits or call wallets, Brain, connected accounts or other plugin services.": "Nur lokal deaktiviert das Remote-Relay. Lokal bevorzugt oder Netzwerk erlauben seine Aktivierung. Diese KI-Datenschutzeinstellungen gelten gemeinsam. Der Fernzugriff stellt nur installierte lokale Modelle bereit; er kann keine Credits ausgeben oder Wallets, Brain, verbundene Konten oder andere Plugin-Dienste aufrufen.",
+    "Reconnecting to koinosai.com…": "Verbindung zu koinosai.com wird wiederhergestellt…",
+    "Remote Access": "Fernzugriff",
+    "The action could not finish.": "Die Aktion konnte nicht abgeschlossen werden.",
+    "USD / month — empty = no limit": "USD pro Monat · leer = unbegrenzt",
+    "budget": "Budget",
+    "revoke": "widerrufen",
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} Anfragen · {1} Eingabe- / {2} Ausgabe-Token · ${3}{4}"
+  }
+}

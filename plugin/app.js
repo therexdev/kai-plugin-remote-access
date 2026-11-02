@@ -15,7 +15,7 @@ async function run(input) {
 function paintRemote(remote) {
   $("btn-remote-toggle").setAttribute("aria-checked", String(remote.enabled === true));
   $("remote-info").hidden = !remote.enabled;
-  $("remote-base").textContent = remote.base || "connecting…";
+  KaiI18n.setText($("remote-base"), remote.base ? KaiI18n.literal(remote.base) : "Connecting…");
   KaiI18n.setText($("remote-state"), remote.state === "connected" ? "Connected — this URL works from anywhere your key goes."
     : remote.state === "offline" ? "Reconnecting to koinosai.com…" : "Connecting…");
 }
@@ -31,14 +31,14 @@ function paint(state) {
     const li = document.createElement("li"), left = document.createElement("span"), meta = document.createElement("span");
     left.textContent = k.name + " "; meta.className = "meta";
     const u = k.usage || { requests: 0, inTok: 0, outTok: 0, costUsd: "0" };
-    meta.textContent = `${u.requests} req · ${u.inTok.toLocaleString()} in / ${u.outTok.toLocaleString()} out tok · $${Number(u.costUsd).toFixed(4)}` + (k.budgetUsdMonthly != null ? ` / $${k.budgetUsdMonthly} budget` : "");
+    KaiI18n.setText(meta, KaiI18n.message`${u.requests} req · ${u.inTok.toLocaleString()} in / ${u.outTok.toLocaleString()} out tok · $${Number(u.costUsd).toFixed(4)}${k.budgetUsdMonthly != null ? KaiI18n.message` / $${k.budgetUsdMonthly} budget` : ""}`);
     left.append(meta);
     const budget = document.createElement("button"); budget.className = "linklike"; KaiI18n.setText(budget, "budget");
     budget.onclick = () => {
       if (li.querySelector(".budget-edit")) return;
       const wrap = document.createElement("span"), input = document.createElement("input"), save = document.createElement("button"), cancel = document.createElement("button");
       wrap.className = "budget-edit"; input.type = "number"; input.min = "0"; input.step = "0.01"; input.className = "small";
-      input.placeholder = "USD / month — empty = no limit"; input.value = k.budgetUsdMonthly ?? "";
+      KaiI18n.setAttr(input, "placeholder", "USD / month — empty = no limit"); input.value = k.budgetUsdMonthly ?? "";
       save.className = "small primary"; KaiI18n.setText(save, "Save"); cancel.className = "small"; KaiI18n.setText(cancel, "Cancel");
       const commit = async () => {
         save.disabled = true; const value = input.value.trim();

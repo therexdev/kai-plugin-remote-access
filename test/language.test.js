@@ -15,5 +15,5 @@ test("only original interface sinks translate; key names, secrets, endpoint and 
   assert.match(source, /left\.textContent = k\.name/);
   assert.match(source, /\$\("new-key-value"\)\.textContent = result\.secret/);
   assert.match(source, /\$\("api-snippet"\)\.textContent/);
-  assert.match(source, /\$\("remote-base"\)\.textContent/);
+  assert.match(source, /KaiI18n\.setText\(\$\("remote-base"\), remote\.base \? KaiI18n\.literal\(remote\.base\)/);
 });
