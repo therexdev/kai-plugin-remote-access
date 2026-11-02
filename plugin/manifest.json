@@ -3,7 +3,7 @@
   "apiVersion": 3,
   "id": "kai.remote-access",
   "name": "KAI Remote Access",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The original Local API workspace with API keys, budgets, usage, privacy controls and optional remote relay access.",
   "entry": "index.html",
   "permissions": [
