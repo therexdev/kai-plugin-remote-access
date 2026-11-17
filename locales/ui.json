@@ -10,7 +10,9 @@
     "USD / month — empty = no limit": "USD al mes · vacío = sin límite",
     "budget": "presupuesto",
     "revoke": "revocar",
-    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitudes · {1} tokens de entrada / {2} de salida · ${3}{4}"
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitudes · {1} tokens de entrada / {2} de salida · ${3}{4}",
+    "Waiting for connection…": "Esperando conexión…",
+    "Connection failed. Retrying koinosai.com…": "La conexión falló. Reintentando con koinosai.com…"
   },
   "pt-BR": {
     "/ ${0} budget": "/ orçamento de ${0}",
@@ -23,7 +25,9 @@
     "USD / month — empty = no limit": "USD por mês · vazio = sem limite",
     "budget": "orçamento",
     "revoke": "revogar",
-    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitações · {1} tokens de entrada / {2} de saída · ${3}{4}"
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} solicitações · {1} tokens de entrada / {2} de saída · ${3}{4}",
+    "Waiting for connection…": "Aguardando conexão…",
+    "Connection failed. Retrying koinosai.com…": "A conexão falhou. Tentando koinosai.com novamente…"
   },
   "fr": {
     "/ ${0} budget": "/ budget de ${0}",
@@ -36,7 +40,9 @@
     "USD / month — empty = no limit": "USD par mois · vide = sans limite",
     "budget": "budget",
     "revoke": "révoquer",
-    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} requêtes · {1} jetons en entrée / {2} en sortie · ${3}{4}"
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} requêtes · {1} jetons en entrée / {2} en sortie · ${3}{4}",
+    "Waiting for connection…": "En attente de connexion…",
+    "Connection failed. Retrying koinosai.com…": "Échec de la connexion. Nouvelle tentative vers koinosai.com…"
   },
   "de": {
     "/ ${0} budget": "/ Budget ${0}",
@@ -49,6 +55,8 @@
     "USD / month — empty = no limit": "USD pro Monat · leer = unbegrenzt",
     "budget": "Budget",
     "revoke": "widerrufen",
-    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} Anfragen · {1} Eingabe- / {2} Ausgabe-Token · ${3}{4}"
+    "{0} req · {1} in / {2} out tok · ${3}{4}": "{0} Anfragen · {1} Eingabe- / {2} Ausgabe-Token · ${3}{4}",
+    "Waiting for connection…": "Warten auf Verbindung…",
+    "Connection failed. Retrying koinosai.com…": "Verbindung fehlgeschlagen. Neuer Versuch mit koinosai.com…"
   }
 }

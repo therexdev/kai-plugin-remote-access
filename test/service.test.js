@@ -10,7 +10,7 @@ function fixture(t, options = {}) {
       async chat(input, signal) { calls.push({ input, signal }); if (options.chat) return options.chat(input, signal); return { object: "chat.completion", choices: [{ message: { role: "assistant", content: "Synthetic local answer" } }], usage: { prompt_tokens: 7, completion_tokens: 3 } }; },
       async embeddings(input, signal) { calls.push({ input, signal }); return { object: "list", data: [{ object: "embedding", index: 0, embedding: [0.25, -0.5] }], model: input.model, usage: { prompt_tokens: 3, total_tokens: 3 } }; },
       async request(input, signal) { calls.push({ input, signal }); return new Response('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: {"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } }); } },
-    network: { status: () => ({ privacyMode: privacy }), configure: async ({ privacyMode }) => { privacy = privacyMode; }, fetch: async () => { throw Error("No real network in test"); } },
+    network: { status: () => ({ privacyMode: privacy }), configure: async ({ privacyMode }) => { privacy = privacyMode; }, fetch: options.fetch || (async () => { throw Error("No real network in test"); }) },
     desktop: { confirm: async () => options.confirm !== false, preferences: () => ({ language: "es" }) }, log() {},
   };
   class Relay {
@@ -20,7 +20,7 @@ function fixture(t, options = {}) {
     stop({ persist = true } = {}) { this.on = false; if (persist) this.settings.set("remote.enabled", false); }
     async drain() {}
   }
-  const service = create(api, { RemoteAccess: Relay }); t.after(() => service.dispose());
+  const service = create(api, options.realRelay ? {} : { RemoteAccess: Relay }); t.after(() => service.dispose());
   return { service, calls, data, api, async key() { return service.call("remote.api", { action: "create", name: "Test client" }); }, revoke() { revoked = true; controller.abort(); } };
 }
 const auth = key => ({ authorization: "Bearer " + key.secret, "content-type": "application/json" });
@@ -81,4 +81,35 @@ test("embeddings use the same authenticated local boundary and report token usag
   assert.equal((await send({ model: "koinos-network:test", input: "no" })).status, 400);
   assert.equal((await send({ model: "local-one", input: { private: true } })).status, 400);
   const status = await f.service.call("remote.api", { action: "status" }); assert.equal(status.keys[0].usage.inTok, 3); assert.equal(status.keys[0].usage.requests, 1);
+});
+
+test("approved remote access connects and forwards streaming and rejected jobs through the public network contract", { timeout: 5000 }, async t => {
+  const { strictFetch, waitFor, heldPoll } = require("./helpers/relay");
+  const jobs = [], responses = []; let hello = 0, acknowledged = 0;
+  const f = fixture(t, { realRelay: true, fetch: strictFetch(async (url, options) => {
+    if (url.endsWith("/hello")) { hello++; return Response.json({ ok: true, tunnelId: "test", base: "https://koinosai.com/r/test/v1" }); }
+    if (url.endsWith("/poll")) return jobs.length ? Response.json({ job: jobs.shift() }) : heldPoll(options.signal);
+    assert.match(url, /\/respond\/test-/);
+    responses.push({ status: options.headers["x-kai-status"], text: await new Response(options.body).text() });
+    return new Response(new ReadableStream({ cancel() { acknowledged++; } }));
+  }) });
+  const key = await f.key();
+  const headers = auth(key);
+  jobs.push(
+    { reqId: "test-stream", method: "POST", path: "/v1/chat/completions", headers, body: Buffer.from(JSON.stringify({ model: "local-one", messages: [{ role: "user", content: "hello" }], stream: true })).toString("base64") },
+    { reqId: "test-forbidden", method: "GET", path: "/core/wallet", headers },
+    { reqId: "test-auth", method: "GET", path: "/v1/models", headers: {} },
+  );
+  await f.service.call("remote.api", { action: "privacy", privacyMode: "local-first" });
+  await f.service.call("remote.api", { action: "toggle", enabled: true });
+  await waitFor(() => responses.length === 3 && acknowledged === 3);
+  const state = await f.service.call("remote.api", { action: "status" });
+  assert.equal(state.remote.state, "connected"); assert.equal(state.remote.base, "https://koinosai.com/r/test/v1");
+  assert.equal(hello, 1);
+  assert.match(responses.find(r => r.status === "200").text, /\[DONE\]/);
+  assert.match(responses.find(r => r.status === "502").text, /only the \/v1 API/);
+  assert.ok(responses.some(r => r.status === "401"));
+  assert.equal(f.calls.length, 1);
+  await f.service.call("remote.api", { action: "toggle", enabled: false });
+  assert.equal((await f.service.call("remote.api", { action: "status" })).remote.state, "off");
 });

@@ -44,6 +44,7 @@ class RemoteAccess {
     this._base = null;
     this._tunnelId = null;
     this._abort = null;
+    this._helloPending = null;
     this._backoff = BACKOFF_MIN_MS;
   }
 
@@ -80,8 +81,11 @@ class RemoteAccess {
     this._on = true;
     this.settings.set("remote.enabled", true);
     this._abort = new AbortController();
+    this._base = null;
+    this._tunnelId = null;
+    this._helloPending = null;
+    this._backoff = BACKOFF_MIN_MS;
     this._setState("connecting");
-    this._track(this._hello()).catch(() => {}); // the loops keep retrying either way
     for (let i = 0; i < POLLERS; i++) this._track(this._loop());
     return this.status();
   }
@@ -102,18 +106,28 @@ class RemoteAccess {
     this.onEvent({ type: "remote:state", state: s, base: this._base });
   }
 
-  async _hello() {
-    const abort = this._abort;
-    if (!this._on || !abort) return;
+  _ensureHello(abort) {
+    if (!this._helloPending) {
+      const task = this._hello(abort).finally(() => {
+        if (this._helloPending === task) this._helloPending = null;
+      });
+      this._helloPending = task;
+    }
+    return this._helloPending;
+  }
+
+  async _hello(abort) {
+    if (!this._on || this._abort !== abort) return;
     const r = await this.fetchImpl(`${this.relayUrl}/relay/hello`, {
       method: "POST",
       headers: { authorization: `Bearer ${this._token()}` },
       signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10_000)]),
-      redirect: "error",
     });
+    if (!this._on || this._abort !== abort) { await r.body?.cancel(); return; }
+    if (!r.ok) { await r.body?.cancel(); throw new Error(`relay answered ${r.status}`); }
     const j = await r.json();
     if (!this._on || this._abort !== abort) return;
-    if (!r.ok || !j.ok) throw new Error(j.error || `relay answered ${r.status}`);
+    if (!j?.ok) throw new Error(`relay rejected handshake (${r.status})`);
     if (typeof j.tunnelId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(j.tunnelId) || j.base !== `${this.relayUrl}/r/${j.tunnelId}/v1`) throw Error("Unexpected relay endpoint");
     this._base = j.base;
     this._tunnelId = j.tunnelId;
@@ -127,21 +141,24 @@ class RemoteAccess {
     const abort = this._abort;
     while (this._on && this._abort === abort) {
       try {
+        // Core's public network API accepts method, headers, body and signal.
+        // It already forbids redirects and supports streamed uploads itself.
+        // Share one handshake between pollers, and retry it after any failure.
+        if (!this._base) await this._ensureHello(abort);
+        if (!this._on || this._abort !== abort) break;
         const r = await this.fetchImpl(`${this.relayUrl}/relay/poll`, {
           headers: { authorization: `Bearer ${this._token()}` },
           signal: AbortSignal.any([abort.signal, AbortSignal.timeout(POLL_TIMEOUT_MS)]),
-          redirect: "error",
         });
-        if (!this._on || this._abort !== abort) break;
+        if (!this._on || this._abort !== abort) { await r.body?.cancel(); break; }
         if (r.status === 200) {
           const { job } = await r.json();
           if (!this._on || this._abort !== abort) break;
           this._backoff = BACKOFF_MIN_MS;
-          if (!this._base) this._track(this._hello()).catch(() => {});
           this._setState("connected");
           // Each poller owns one request until its stream ends. The three
           // pollers serve concurrently without an unbounded background queue.
-          if (job) await this._handle(job, abort).catch(() => {});
+          if (job) await this._handle(job, abort);
           continue;
         }
         if (r.status === 204) {
@@ -149,13 +166,24 @@ class RemoteAccess {
           this._setState("connected");
           continue;
         }
+        await r.body?.cancel();
         throw new Error(`relay answered ${r.status}`);
       } catch (e) {
         if (!this._on || this._abort !== abort) break;
-        if (this._state !== "connecting") this._setState("offline");
+        this._setState("offline");
         await delay(this._backoff, undefined, { signal: abort.signal }).catch(() => {});
         this._backoff = Math.min(this._backoff * 2, BACKOFF_MAX_MS);
       }
+    }
+  }
+
+  async _respond(url, options) {
+    const response = await this.fetchImpl(url, options);
+    try {
+      if (!response.ok) throw new Error(`relay answered ${response.status}`);
+    } finally {
+      // Release Core's tracked network request even when the relay sends a body.
+      await response.body?.cancel();
     }
   }
 
@@ -186,18 +214,17 @@ class RemoteAccess {
       });
     } catch (e) {
       const msg = JSON.stringify({ error: { message: String(e.message || e), type: "relay_device_error" } });
-      await this.fetchImpl(respondUrl, {
+      await this._respond(respondUrl, {
         method: "POST",
         headers: { authorization: `Bearer ${this._token()}`, "x-kai-status": "502", "x-kai-headers": Buffer.from('{"content-type":"application/json"}').toString("base64") },
         body: msg,
         signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15_000)]),
-        redirect: "error",
-      }).catch(() => {});
+      });
       return;
     }
     const outHeaders = {};
     for (const k of ["content-type", "cache-control"]) if (localRes.headers.get(k)) outHeaders[k] = localRes.headers.get(k);
-    await this.fetchImpl(respondUrl, {
+    try { await this._respond(respondUrl, {
       method: "POST",
       headers: {
         authorization: `Bearer ${this._token()}`,
@@ -205,10 +232,10 @@ class RemoteAccess {
         "x-kai-headers": Buffer.from(JSON.stringify(outHeaders)).toString("base64"),
       },
       body: localRes.body, // streamed through — SSE arrives chunk by chunk
-      duplex: "half",
       signal: AbortSignal.any([abort.signal, AbortSignal.timeout(240_000)]),
-      redirect: "error",
-    }).catch(() => {});
+    }); } finally {
+      if (!localRes.body?.locked) await localRes.body?.cancel().catch(() => {});
+    }
     this.onEvent({ type: "remote:served", path: job.path });
   }
 }
