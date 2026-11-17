@@ -16,3 +16,22 @@ test("native broker owns network, credentials and key creation; all original con
   for (const id of new Set([...js.matchAll(/\$\("([^"]+)"\)/g)].map(m => m[1]))) assert.ok(html.includes(`id="${id}"`), id);
   assert.match(js, /pagehide/); assert.match(js, /new-key-value"\)\.textContent = ""/);
 });
+
+test("failed connections show a retry state instead of remaining on Connecting", () => {
+  const elements = new Map();
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, { textContent: "", setAttribute() {} });
+    return elements.get(id);
+  };
+  const context = {
+    document: { getElementById: element }, setInterval() {},
+    window: { kaiLanguageReady: { then() {} }, addEventListener() {} },
+    KaiI18n: { literal: value => value, setText: (target, value) => { target.textContent = value; } },
+  };
+  vm.runInNewContext(js + '\npaintRemote({enabled:true,state:"offline",base:null});', context);
+  assert.equal(element("remote-base").textContent, "Waiting for connection…");
+  assert.equal(element("remote-state").textContent, "Connection failed. Retrying koinosai.com…");
+  vm.runInNewContext('paintRemote({enabled:true,state:"connected",base:"https://koinosai.com/r/test/v1"});', context);
+  assert.equal(element("remote-base").textContent, "https://koinosai.com/r/test/v1");
+  assert.match(element("remote-state").textContent, /^Connected/);
+});

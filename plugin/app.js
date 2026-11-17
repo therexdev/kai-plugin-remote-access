@@ -15,9 +15,9 @@ async function run(input) {
 function paintRemote(remote) {
   $("btn-remote-toggle").setAttribute("aria-checked", String(remote.enabled === true));
   $("remote-info").hidden = !remote.enabled;
-  KaiI18n.setText($("remote-base"), remote.base ? KaiI18n.literal(remote.base) : "Connecting…");
+  KaiI18n.setText($("remote-base"), remote.base ? KaiI18n.literal(remote.base) : remote.state === "offline" ? "Waiting for connection…" : "Connecting…");
   KaiI18n.setText($("remote-state"), remote.state === "connected" ? "Connected — this URL works from anywhere your key goes."
-    : remote.state === "offline" ? "Reconnecting to koinosai.com…" : "Connecting…");
+    : remote.state === "offline" ? "Connection failed. Retrying koinosai.com…" : "Connecting…");
 }
 function paint(state) {
   latest = state;

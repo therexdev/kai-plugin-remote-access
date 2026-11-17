@@ -1,3 +1,11 @@
+# KAI Remote Access 0.3.3
+
+Fixes remote access remaining on Connecting after approval. Relay requests now use only the supported Foundation network options, including streamed responses. Failed connection attempts show a retry state, and pollers share and retry the initial handshake before reporting a usable URL. Relay response bodies are released and failed uploads are no longer reported as served.
+
+Adds regression coverage for the approved service flow, transient handshake failure and recovery, idle polling, streamed replies, authentication, forbidden routes and cancellation. No Core update or credential reset is required by this change.
+
+## Previous release
+
 # KAI Remote Access 0.3.2
 
 Completes translation coverage for menus, forms, dialogs, tooltips and changing status text in English, Spanish, Brazilian Portuguese, French and German. Open views follow the language saved in Core Settings, including labels created after the view loads. Drafts, names, code and other user content remain intact.
