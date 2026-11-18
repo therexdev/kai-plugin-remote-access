@@ -223,7 +223,7 @@ class RemoteAccess {
       return;
     }
     const outHeaders = {};
-    for (const k of ["content-type", "cache-control"]) if (localRes.headers.get(k)) outHeaders[k] = localRes.headers.get(k);
+    for (const k of ["content-type", "cache-control", "x-kai-context-size"]) if (localRes.headers.get(k)) outHeaders[k] = localRes.headers.get(k);
     try { await this._respond(respondUrl, {
       method: "POST",
       headers: {
