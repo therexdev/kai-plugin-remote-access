@@ -2,9 +2,22 @@
 const http = require("node:http");
 const { once } = require("node:events");
 const MAX_BODY = 128 * 1024;
+const validContext = value => Number.isSafeInteger(value) && value >= 1024 && value <= 262144;
+// Core reports a permitted ceiling; this is not evidence that a runner has
+// already allocated it. Older Core builds do not promise automatic growth.
+function modelContext(model) {
+  if (!validContext(model.contextSize)) return {};
+  const automatic = validContext(model.defaultContextSize) && typeof model.contextLimitKnown === "boolean";
+  return { context_window: model.contextSize, context_mode: automatic ? "auto" : "fixed" };
+}
 function validateChat(value, models) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(k => !["model", "messages", "stream", "max_tokens", "max_completion_tokens", "temperature", "top_p", "stop", "seed", "stream_options"].includes(k))) throw Error("Only local text chat is supported; tools and private application features are not exposed.");
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(k => !["model", "messages", "stream", "max_tokens", "max_completion_tokens", "temperature", "top_p", "stop", "seed", "stream_options", "context_tokens"].includes(k))) throw Error("Only local text chat is supported; tools and private application features are not exposed.");
   if (typeof value.model !== "string" || !models.some(m => m.alias === value.model)) throw Error("Choose an installed local model.");
+  if (value.context_tokens !== undefined) {
+    const context = modelContext(models.find(m => m.alias === value.model));
+    if (context.context_mode !== "auto") throw Error("This Core version does not advertise automatic context allocation.");
+    if (!Number.isSafeInteger(value.context_tokens) || value.context_tokens < 1 || value.context_tokens > context.context_window) throw Error(`context_tokens must fit this model's ${context.context_window}-token limit.`);
+  }
   if (!Array.isArray(value.messages) || !value.messages.length || value.messages.length > 256 || value.messages.some(m => !m || Object.keys(m).some(k => !["role", "content"].includes(k)) || !["system", "developer", "user", "assistant"].includes(m.role) || typeof m.content !== "string")) throw Error("Use text messages with supported roles.");
   const max = value.max_completion_tokens ?? value.max_tokens ?? 1024;
   if (!Number.isSafeInteger(max) || max < 1 || max > 32768) throw Error("Choose an output limit from 1 to 32,768 tokens.");
@@ -42,7 +55,7 @@ function createLocalApi({ api, keys, onError = () => {} }) {
     const now = Date.now(), recent = (rates.get(key.id) || []).filter(t => now - t < 60000);
     if (recent.length >= 60 || pending.size >= 4) return fail(res, 429, "Remote Access request limit reached. Try again shortly.");
     recent.push(now); rates.set(key.id, recent);
-    if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ object: "list", data: models().map(m => ({ id: m.alias, object: "model", owned_by: "local" })) })); }
+    if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ object: "list", data: models().map(m => ({ id: m.alias, object: "model", owned_by: "local", ...modelContext(m) })) })); }
     const controller = new AbortController(); pending.add(controller);
     const cancel = () => { if (!res.writableEnded) controller.abort(Error("API client disconnected")); };
     res.once("close", cancel);
@@ -58,7 +71,9 @@ function createLocalApi({ api, keys, onError = () => {} }) {
         const response = await api.models.request({ ...input, stream_options: { include_usage: true } }, signal);
         if (!response.ok) return fail(res, response.status >= 400 && response.status <= 599 ? response.status : 502, "Local model request failed.");
         if (!keys.verify(auth.slice(7))) return fail(res, 401, "The API key was revoked.");
-        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store" });
+        const context = response.headers.get("x-kai-context-size");
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store",
+          ...(/^[1-9][0-9]{0,6}$/.test(context || "") && validContext(Number(context)) ? { "x-kai-context-size": context } : {}) });
         let parse = ""; const decoder = new TextDecoder();
         for await (const chunk of response.body || []) {
           signal.throwIfAborted(); if (!keys.verify(auth.slice(7))) throw Error("The API key was revoked.");
@@ -97,4 +112,4 @@ function createLocalApi({ api, keys, onError = () => {} }) {
     async stop() { closed = true; this.cancelRequests(); for (const socket of sockets) socket.destroy(); const current = server; server = null; port = 0; if (current) await new Promise(resolve => current.close(resolve)); },
   };
 }
-module.exports = { createLocalApi, validateChat, validateEmbedding };
+module.exports = { createLocalApi, validateChat, validateEmbedding, modelContext };

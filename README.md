@@ -37,3 +37,9 @@ CI tests source on `foundation-v1`, pull requests and `main` on Windows, macOS a
 This plugin follows the language saved in KAI Core Settings and applies changes to open views. English, Spanish, Brazilian Portuguese, French and German are supported through bundled offline catalogs. User content and identifiers stay literal. These source changes require Core 0.7.17+ for the live locale API; release the Core update before publishing a new signed plugin package and catalog entry. See the [public localization API](https://github.com/therexdev/kai-core/blob/main/docs/foundation/PLUGIN_AUTHOR_GUIDE.md#shared-language-and-localization-core-0717).
 
 [Interface language and translation guide](docs/localization.md).
+
+## Automatic model context
+
+With the Core context allocation update, `/v1/models` exposes `context_window` (the permitted input-plus-output ceiling) and `context_mode: "auto"`. The ceiling respects the owner's per-model cap; it is not an already allocated or GPU-tested size. Ordinary requests grow automatically. Clients may send an optional integer `context_tokens` minimum for one request, within that ceiling. This does not change saved preferences. Older Core metadata uses `fixed` mode or omits context information; no larger capacity is invented.
+
+Streaming responses forward the verified allocation in `x-kai-context-size`; non-streaming replies retain Core's `kai_context`. The remote relay forwards the allocation header too. Remote Access still provides local inference only and retains its 128 KiB body bound, authentication, revocation and approved relay boundary. Larger prepaid-network windows are a separate scheduler/protocol rollout.

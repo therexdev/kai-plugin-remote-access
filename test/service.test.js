@@ -1,15 +1,15 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const { create } = require("../plugin/service");
-const { validateChat } = require("../plugin/service/local-api");
+const { validateChat, modelContext } = require("../plugin/service/local-api");
 function fixture(t, options = {}) {
   const data = {}, calls = [], controller = new AbortController(); let privacy = "local-only", revoked = false;
   const settings = { get(k, fallback) { if (revoked) throw Error("Revoked"); return k.split(".").reduce((o, p) => o?.[p], data) ?? fallback; }, set(k, v) { if (revoked) throw Error("Revoked"); const parts = k.split("."); let at = data; for (const p of parts.slice(0, -1)) at = at[p] ||= {}; at[parts.at(-1)] = structuredClone(v); } };
   const api = { version: 1, plugin: { id: "kai.remote-access" }, signal: controller.signal, settings,
-    models: { list: () => [{ alias: "local-one", status: "ready" }, { alias: "not-installed", status: "missing" }, { alias: "koinos-network:test", status: "ready" }, { alias: "desktop:secret", status: "ready" }],
+    models: { list: () => options.models || [{ alias: "local-one", status: "ready" }, { alias: "not-installed", status: "missing" }, { alias: "koinos-network:test", status: "ready" }, { alias: "desktop:secret", status: "ready" }],
       async chat(input, signal) { calls.push({ input, signal }); if (options.chat) return options.chat(input, signal); return { object: "chat.completion", choices: [{ message: { role: "assistant", content: "Synthetic local answer" } }], usage: { prompt_tokens: 7, completion_tokens: 3 } }; },
       async embeddings(input, signal) { calls.push({ input, signal }); return { object: "list", data: [{ object: "embedding", index: 0, embedding: [0.25, -0.5] }], model: input.model, usage: { prompt_tokens: 3, total_tokens: 3 } }; },
-      async request(input, signal) { calls.push({ input, signal }); return new Response('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: {"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } }); } },
+      async request(input, signal) { calls.push({ input, signal }); return new Response('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: {"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream", ...(options.contextHeader ? { "x-kai-context-size": options.contextHeader } : {}) } }); } },
     network: { status: () => ({ privacyMode: privacy }), configure: async ({ privacyMode }) => { privacy = privacyMode; }, fetch: options.fetch || (async () => { throw Error("No real network in test"); }) },
     desktop: { confirm: async () => options.confirm !== false, preferences: () => ({ language: "es" }) }, log() {},
   };
@@ -86,11 +86,11 @@ test("embeddings use the same authenticated local boundary and report token usag
 test("approved remote access connects and forwards streaming and rejected jobs through the public network contract", { timeout: 5000 }, async t => {
   const { strictFetch, waitFor, heldPoll } = require("./helpers/relay");
   const jobs = [], responses = []; let hello = 0, acknowledged = 0;
-  const f = fixture(t, { realRelay: true, fetch: strictFetch(async (url, options) => {
+  const f = fixture(t, { realRelay: true, contextHeader: "8192", fetch: strictFetch(async (url, options) => {
     if (url.endsWith("/hello")) { hello++; return Response.json({ ok: true, tunnelId: "test", base: "https://koinosai.com/r/test/v1" }); }
     if (url.endsWith("/poll")) return jobs.length ? Response.json({ job: jobs.shift() }) : heldPoll(options.signal);
     assert.match(url, /\/respond\/test-/);
-    responses.push({ status: options.headers["x-kai-status"], text: await new Response(options.body).text() });
+    responses.push({ status: options.headers["x-kai-status"], headers: JSON.parse(Buffer.from(options.headers["x-kai-headers"], "base64").toString()), text: await new Response(options.body).text() });
     return new Response(new ReadableStream({ cancel() { acknowledged++; } }));
   }) });
   const key = await f.key();
@@ -107,9 +107,37 @@ test("approved remote access connects and forwards streaming and rejected jobs t
   assert.equal(state.remote.state, "connected"); assert.equal(state.remote.base, "https://koinosai.com/r/test/v1");
   assert.equal(hello, 1);
   assert.match(responses.find(r => r.status === "200").text, /\[DONE\]/);
+  assert.equal(responses.find(r => r.status === "200").headers["x-kai-context-size"], "8192");
   assert.match(responses.find(r => r.status === "502").text, /only the \/v1 API/);
   assert.ok(responses.some(r => r.status === "401"));
   assert.equal(f.calls.length, 1);
   await f.service.call("remote.api", { action: "toggle", enabled: false });
   assert.equal((await f.service.call("remote.api", { action: "status" })).remote.state, "off");
+});
+
+test("context discovery exposes the user ceiling without claiming an active allocation", async t => {
+  const models = [{ alias: "local-one", status: "ready", contextSize: 16384, defaultContextSize: 32768, contextLimitKnown: true, privatePath: "/not-public" }];
+  const f = fixture(t, { models }), state = await f.service.startBackground(), key = await f.key();
+  const response = await fetch(state.localBase + "/v1/models", { headers: auth(key) });
+  assert.deepEqual((await response.json()).data, [{ id: "local-one", object: "model", owned_by: "local", context_window: 16384, context_mode: "auto" }]);
+  assert.equal(f.calls.length, 0);
+  models[0].contextSize = 4096;
+  const reduced = await fetch(state.localBase + "/v1/models", { headers: auth(key) });
+  assert.equal((await reduced.json()).data[0].context_window, 4096);
+  assert.deepEqual(modelContext({ contextSize: 4096 }), { context_window: 4096, context_mode: "fixed" });
+  assert.deepEqual(modelContext({ contextSize: "32768" }), {});
+  assert.deepEqual(modelContext({}), {});
+});
+
+test("per-request context is validated and forwarded without changing model preferences", async t => {
+  const model = { alias: "local-one", status: "ready", contextSize: 16384, defaultContextSize: 32768, contextLimitKnown: true };
+  const f = fixture(t, { models: [model], contextHeader: "8192" }), state = await f.service.startBackground(), key = await f.key();
+  const input = { model: model.alias, messages: [{ role: "user", content: "provided text ".repeat(1500) }], max_tokens: 1024, context_tokens: 8192, stream: true };
+  const response = await fetch(state.localBase + "/v1/chat/completions", { method: "POST", headers: auth(key), body: JSON.stringify(input) });
+  assert.equal(response.status, 200); assert.equal(response.headers.get("x-kai-context-size"), "8192");
+  assert.match(await response.text(), /\[DONE\]/);
+  assert.equal(f.calls[0].input.context_tokens, 8192); assert.equal(model.contextSize, 16384);
+  for (const context_tokens of [0, -1, "8192", 8192.5, 32768, null]) assert.throws(() => validateChat({ ...input, context_tokens }, [model]));
+  assert.throws(() => validateChat(input, [{ alias: model.alias, contextSize: 4096 }]), /does not advertise/);
+  assert.equal(validateChat({ ...input, context_tokens: undefined }, [{ alias: model.alias }]).max_tokens, 1024);
 });
