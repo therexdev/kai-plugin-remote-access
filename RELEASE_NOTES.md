@@ -1,3 +1,13 @@
+# KAI Remote Access 0.3.4
+
+API clients can now discover each local model's permitted context window. With Core 0.7.32 or newer, requests can ask for a larger minimum and Core allocates and verifies the needed context automatically. The verified allocation is preserved in streaming responses through the local API and remote relay.
+
+Update **KAI Core to 0.7.32 first**, then update this plugin from **Plugins**. Install **kai Android 0.4.16** for automatic discovery before chats and saved tasks. Existing API keys and connection addresses remain valid; no credential reset is required. Older Core versions keep their existing fixed-window behavior.
+
+The API remains limited to installed local models, bounded text inference and embeddings. Request-body limits and prepaid-network routing are unchanged.
+
+## Previous release
+
 # KAI Remote Access 0.3.3
 
 Fixes remote access remaining on Connecting after approval. Relay requests now use only the supported Foundation network options, including streamed responses. Failed connection attempts show a retry state, and pollers share and retry the initial handshake before reporting a usable URL. Relay response bodies are released and failed uploads are no longer reported as served.
