@@ -1,3 +1,13 @@
+# KAI Remote Access 0.3.5
+
+Streaming inference rejections now preserve HTTP status and report a bounded, safe error category for context limits, chat templates, unavailable models, memory allocation and generation parameters. Request validation is identified separately from model rejection. Raw engine errors, prompts, local paths and credentials are not exposed; requests are never retried by this handling.
+
+Update Remote Access from Plugins, then fully quit and reopen KAI Core. Core 0.7.32 already provides automatic context sizing. kai Android 0.4.18 displays the new categories and adds an explicit Test response button using only synthetic local test text. Existing keys, addresses and saved model settings remain valid.
+
+These diagnostics do not establish the cause of the reported phone HTTP 400. Regression checks use simulated model errors; the owner's live model still needs a response test.
+
+## Previous release
+
 # KAI Remote Access 0.3.4
 
 API clients can now discover each local model's permitted context window. With Core 0.7.32 or newer, requests can ask for a larger minimum and Core allocates and verifies the needed context automatically. The verified allocation is preserved in streaming responses through the local API and remote relay.

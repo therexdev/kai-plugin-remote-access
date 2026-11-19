@@ -1,6 +1,7 @@
 "use strict";
 const http = require("node:http");
 const { once } = require("node:events");
+const { modelResponseError } = require("./model-errors");
 const MAX_BODY = 128 * 1024;
 const validContext = value => Number.isSafeInteger(value) && value >= 1024 && value <= 262144;
 // Core reports a permitted ceiling; this is not evidence that a runner has
@@ -44,7 +45,7 @@ function createLocalApi({ api, keys, onError = () => {} }) {
   let server, port = 0, closed = false;
   const pending = new Set(), sockets = new Set(), rates = new Map();
   const models = () => api.models.list().filter(m => m.status === "ready" && !/^(desktop:|koinos-network)/.test(m.alias));
-  const fail = (res, status, message) => { if (!res.headersSent) res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: { message, type: "remote_access_error" } })); };
+  const fail = (res, status, message, details = {}) => { if (!res.headersSent) res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: { message, type: "remote_access_error", ...details } })); };
   async function route(req, res) {
     if (closed || api.signal.aborted) return fail(res, 503, "Remote Access is closing.");
     if (req.headers.host !== `127.0.0.1:${port}` || req.headers.origin) return fail(res, 403, "This API accepts native loopback clients only.");
@@ -64,12 +65,16 @@ function createLocalApi({ api, keys, onError = () => {} }) {
       for await (const chunk of req) { size += chunk.length; if (size > MAX_BODY) return fail(res, 413, "Request body exceeds 128 KB."); chunks.push(chunk); }
       let input;
       try { input = (req.url === "/v1/embeddings" ? validateEmbedding : validateChat)(JSON.parse(Buffer.concat(chunks).toString("utf8")), models()); }
-      catch (error) { return fail(res, 400, error instanceof SyntaxError ? "Invalid JSON." : error.message); }
+      catch (error) { return fail(res, 400, error instanceof SyntaxError ? "Invalid JSON." : error.message, { source: "request_validation", code: "invalid_request" }); }
       const signal = AbortSignal.any([api.signal, controller.signal, AbortSignal.timeout(240000)]);
       let usage = null;
       if (input.stream) {
         const response = await api.models.request({ ...input, stream_options: { include_usage: true } }, signal);
-        if (!response.ok) return fail(res, response.status >= 400 && response.status <= 599 ? response.status : 502, "Local model request failed.");
+        if (!response.ok) {
+          const reason = await modelResponseError(response);
+          if (!keys.verify(auth.slice(7))) return fail(res, 401, "The API key was revoked.");
+          return fail(res, response.status >= 400 && response.status <= 599 ? response.status : 502, reason.message, reason);
+        }
         if (!keys.verify(auth.slice(7))) return fail(res, 401, "The API key was revoked.");
         const context = response.headers.get("x-kai-context-size");
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store",

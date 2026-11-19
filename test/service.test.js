@@ -9,7 +9,7 @@ function fixture(t, options = {}) {
     models: { list: () => options.models || [{ alias: "local-one", status: "ready" }, { alias: "not-installed", status: "missing" }, { alias: "koinos-network:test", status: "ready" }, { alias: "desktop:secret", status: "ready" }],
       async chat(input, signal) { calls.push({ input, signal }); if (options.chat) return options.chat(input, signal); return { object: "chat.completion", choices: [{ message: { role: "assistant", content: "Synthetic local answer" } }], usage: { prompt_tokens: 7, completion_tokens: 3 } }; },
       async embeddings(input, signal) { calls.push({ input, signal }); return { object: "list", data: [{ object: "embedding", index: 0, embedding: [0.25, -0.5] }], model: input.model, usage: { prompt_tokens: 3, total_tokens: 3 } }; },
-      async request(input, signal) { calls.push({ input, signal }); return new Response('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: {"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream", ...(options.contextHeader ? { "x-kai-context-size": options.contextHeader } : {}) } }); } },
+      async request(input, signal) { calls.push({ input, signal }); if (options.request) return options.request(input, signal); return new Response('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: {"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream", ...(options.contextHeader ? { "x-kai-context-size": options.contextHeader } : {}) } }); } },
     network: { status: () => ({ privacyMode: privacy }), configure: async ({ privacyMode }) => { privacy = privacyMode; }, fetch: options.fetch || (async () => { throw Error("No real network in test"); }) },
     desktop: { confirm: async () => options.confirm !== false, preferences: () => ({ language: "es" }) }, log() {},
   };
@@ -140,4 +140,24 @@ test("per-request context is validated and forwarded without changing model pref
   for (const context_tokens of [0, -1, "8192", 8192.5, 32768, null]) assert.throws(() => validateChat({ ...input, context_tokens }, [model]));
   assert.throws(() => validateChat(input, [{ alias: model.alias, contextSize: 4096 }]), /does not advertise/);
   assert.equal(validateChat({ ...input, context_tokens: undefined }, [{ alias: model.alias }]).max_tokens, 1024);
+});
+
+
+test("streaming model rejections preserve status and a safe reason without replay or metering", async t => {
+  for (const [message, code] of [["context length exceeded private-prompt", "context_limit"], ["Failed to apply chat template private-key", "chat_template"], ["CUDA out of memory private-path", "memory_exhausted"], ["other private-prompt", "model_rejected"]]) {
+    const f = fixture(t, { request: () => Response.json({ error: { message } }, { status: 400 }) });
+    const state = await f.service.startBackground(), key = await f.key();
+    const r = await fetch(state.localBase + "/v1/chat/completions", { method: "POST", headers: auth(key), body: JSON.stringify({ model: "local-one", stream: true, messages: [{ role: "user", content: "hello" }] }) });
+    assert.equal(r.status, 400); const body = await r.json();
+    assert.equal(body.error.code, code); assert.equal(body.error.source, "local_model");
+    assert.ok(!JSON.stringify(body).includes("private-")); assert.equal(f.calls.length, 1);
+    assert.equal((await f.service.call("remote.api", { action: "status" })).keys[0].usage.requests, 0);
+  }
+});
+
+test("validation errors identify rejection before model inference", async t => {
+  const f = fixture(t), state = await f.service.startBackground(), key = await f.key();
+  const r = await fetch(state.localBase + "/v1/chat/completions", { method: "POST", headers: auth(key), body: JSON.stringify({ model: "local-one", tools: [], messages: [{ role: "user", content: "hello" }] }) });
+  assert.equal(r.status, 400); const error = (await r.json()).error;
+  assert.equal(error.source, "request_validation"); assert.equal(error.code, "invalid_request"); assert.equal(f.calls.length, 0);
 });
