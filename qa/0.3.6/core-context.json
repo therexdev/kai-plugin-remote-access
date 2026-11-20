@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "engine": "synthetic child process",
+  "liveModelTested": false,
+  "checks": [
+    "Authenticated discovery reports the permitted ceiling",
+    "Core SDK preserves verified allocation",
+    "Long streaming request grows 4K to 16K through Remote Access",
+    "Per-request sizing leaves saved preferences intact",
+    "A reduced owner cap is immediately advertised and enforced"
+  ]
+}

@@ -1,3 +1,17 @@
+# KAI Remote Access 0.3.6
+
+Slow streaming requests send a keep-alive every 15 seconds while the local model loads, processes the prompt or pauses during generation. This prevents a silent model from leaving the relay idle until its proxy timeout. Keep-alives are SSE comments, never generated text or an action result.
+
+Late errors are structured SSE errors with a safe category and original status. Fast validation and model errors retain their HTTP status. Verified context allocation stays in the response header when available early, or arrives as `kai_context` metadata after an early keep-alive. Fragmented model frames remain intact.
+
+Remote inference has a 170-second total limit, leaving headroom before Core 0.7.32's 180-second network-request limit. Local-only requests retain the existing four-minute limit. Requests are never automatically retried. Cancellation, key revocation and plugin shutdown still stop work.
+
+Update Remote Access from Plugins, then fully quit and reopen KAI Core. Core 0.7.32 is sufficient; existing keys, URLs and saved preferences remain valid. kai Android 0.4.25 adds late context metadata and clear timeout reporting. Older kai versions already ignore the keep-alive comments.
+
+Validation uses synthetic model responses, including cancellation and late rejection. This transport change does not establish that a particular model will select or complete a Google action correctly.
+
+## Previous release
+
 # KAI Remote Access 0.3.5
 
 Streaming inference rejections now preserve HTTP status and report a bounded, safe error category for context limits, chat templates, unavailable models, memory allocation and generation parameters. Request validation is identified separately from model rejection. Raw engine errors, prompts, local paths and credentials are not exposed; requests are never retried by this handling.

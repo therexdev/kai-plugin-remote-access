@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "hostedRelay": false,
+  "loopbackRelayAndIdleProxy": true,
+  "realCorePublicSdk": true,
+  "syntheticEngine": true,
+  "realModelOrGoogleAction": false,
+  "headersMs": 15032,
+  "firstByteMs": 15032,
+  "elapsedMs": 140035,
+  "heartbeats": 9,
+  "modelRequests": 1,
+  "contextSize": 8192,
+  "activeNetworkAfterStop": 0
+}

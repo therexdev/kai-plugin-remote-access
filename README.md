@@ -10,6 +10,12 @@ The plugin starts an OpenAI-compatible HTTP listener on `127.0.0.1`. Its current
 
 Only `GET /v1/models`, `POST /v1/chat/completions` and `POST /v1/embeddings` are available. The model list includes installed, ready local models. Chat accepts bounded text messages and supports live streaming. Other routes, tools, private provider models, browser-origin requests and plugin service calls are rejected. Core wallets, Brain, connected accounts and other apps are never remote endpoints.
 
+Streaming requests send an SSE comment every 15 seconds while waiting for the model. A heartbeat is transport activity, not generated text or successful completion. Remote inference ends after 170 seconds, before Core 0.7.32's 180-second public-network bound; direct local inference retains its four-minute limit. Non-streaming JSON requests cannot use SSE keep-alives and remain subject to intermediary timeouts. Cancellation never retries a request.
+
+Fast errors retain their HTTP status. After a keep-alive starts the stream, a late failure is a `data:` event containing `error.status`, `error.code` when classified, and a safe message; it has no `[DONE]` success marker. If allocation is verified after response headers were committed, `data: {"kai_context":{"contextSize":8192,"verified":true}}` carries the real size instead of an invented header. Clients should ignore comments, read verified context metadata, and treat error events as failures.
+
+`node scripts/probe-slow-relay.js ../kai-core 140000 ../kai-relay-site` exercises a real 140-second delay through Core's public SDK, the Remote Access service, the hosted relay implementation and a loopback proxy with a 125-second idle timeout. Only DNS/socket destinations are adapted for the isolated fixture; no real model or Google account is used. Omitting the last argument instead uses a disposable hosted relay connection and requires public network access.
+
 Local inference has zero network charge. Actual returned token usage is recorded. Dollar budgets remain visible and stored, but this local-only API cannot purchase or spend credits; enabling the relay does not grant paid network inference.
 
 The remote switch requires a key, Local-First or Network privacy mode, and an explicit review. Prompts and replies pass through koinosai.com. Page changes and KAI's tray state leave the plugin running. Stop, Local-Only, disabling/removing the plugin and quitting KAI stop the relay; revoking a key cancels active inference. A previously enabled relay can resume at startup when privacy permits.
