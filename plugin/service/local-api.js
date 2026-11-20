@@ -1,7 +1,7 @@
 "use strict";
 const http = require("node:http");
-const { once } = require("node:events");
 const { modelResponseError } = require("./model-errors");
+const { streamOutput, HEARTBEAT_MS, LOCAL_DEADLINE_MS, REMOTE_DEADLINE_MS } = require("./stream-output");
 const MAX_BODY = 128 * 1024;
 const validContext = value => Number.isSafeInteger(value) && value >= 1024 && value <= 262144;
 // Core reports a permitted ceiling; this is not evidence that a runner has
@@ -41,11 +41,17 @@ function validateEmbedding(value, models) {
   if (value.user !== undefined && (typeof value.user !== "string" || value.user.length > 200)) throw Error("Invalid embedding user label.");
   return structuredClone(value);
 }
-function createLocalApi({ api, keys, onError = () => {} }) {
+function createLocalApi({ api, keys, onError = () => {}, heartbeatMs = HEARTBEAT_MS, localDeadlineMs = LOCAL_DEADLINE_MS, remoteDeadlineMs = REMOTE_DEADLINE_MS }) {
   let server, port = 0, closed = false;
   const pending = new Set(), sockets = new Set(), rates = new Map();
   const models = () => api.models.list().filter(m => m.status === "ready" && !/^(desktop:|koinos-network)/.test(m.alias));
-  const fail = (res, status, message, details = {}) => { if (!res.headersSent) res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: { message, type: "remote_access_error", ...details } })); };
+  const fail = (res, status, message, details = {}) => {
+    if (res.writableEnded || res.destroyed) return;
+    const streaming = res.headersSent && String(res.getHeader("content-type")).includes("text/event-stream");
+    if (!res.headersSent) res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+    const payload = JSON.stringify({ error: { message, type: "remote_access_error", status, ...details } });
+    res.end(streaming ? `data: ${payload}\n\n` : payload);
+  };
   async function route(req, res) {
     if (closed || api.signal.aborted) return fail(res, 503, "Remote Access is closing.");
     if (req.headers.host !== `127.0.0.1:${port}` || req.headers.origin) return fail(res, 403, "This API accepts native loopback clients only.");
@@ -60,34 +66,32 @@ function createLocalApi({ api, keys, onError = () => {} }) {
     const controller = new AbortController(); pending.add(controller);
     const cancel = () => { if (!res.writableEnded) controller.abort(Error("API client disconnected")); };
     res.once("close", cancel);
+    let output, deadline;
     try {
       let size = 0; const chunks = [];
       for await (const chunk of req) { size += chunk.length; if (size > MAX_BODY) return fail(res, 413, "Request body exceeds 128 KB."); chunks.push(chunk); }
       let input;
       try { input = (req.url === "/v1/embeddings" ? validateEmbedding : validateChat)(JSON.parse(Buffer.concat(chunks).toString("utf8")), models()); }
       catch (error) { return fail(res, 400, error instanceof SyntaxError ? "Invalid JSON." : error.message, { source: "request_validation", code: "invalid_request" }); }
-      const signal = AbortSignal.any([api.signal, controller.signal, AbortSignal.timeout(240000)]);
+      deadline = AbortSignal.timeout(req.headers["x-kai-remote-access"] === "1" ? remoteDeadlineMs : localDeadlineMs);
+      const signal = AbortSignal.any([api.signal, controller.signal, deadline]);
       let usage = null;
       if (input.stream) {
+        output = streamOutput(res, signal, heartbeatMs);
         const response = await api.models.request({ ...input, stream_options: { include_usage: true } }, signal);
+        signal.throwIfAborted();
         if (!response.ok) {
           const reason = await modelResponseError(response);
+          signal.throwIfAborted();
           if (!keys.verify(auth.slice(7))) return fail(res, 401, "The API key was revoked.");
           return fail(res, response.status >= 400 && response.status <= 599 ? response.status : 502, reason.message, reason);
         }
         if (!keys.verify(auth.slice(7))) return fail(res, 401, "The API key was revoked.");
         const context = response.headers.get("x-kai-context-size");
-        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store",
-          ...(/^[1-9][0-9]{0,6}$/.test(context || "") && validContext(Number(context)) ? { "x-kai-context-size": context } : {}) });
-        let parse = ""; const decoder = new TextDecoder();
-        for await (const chunk of response.body || []) {
-          signal.throwIfAborted(); if (!keys.verify(auth.slice(7))) throw Error("The API key was revoked.");
-          parse += decoder.decode(chunk, { stream: true });
-          const lines = parse.split("\n"); parse = lines.pop();
-          for (const line of lines) if (line.startsWith("data: ") && line.slice(6) !== "[DONE]") { try { const value = JSON.parse(line.slice(6)); if (value.usage) usage = value.usage; } catch {} }
-          if (parse.length > 1048576) throw Error("Invalid model stream.");
-          if (!res.write(Buffer.from(chunk))) await once(res, "drain", { signal });
-        }
+        await output.context(/^[1-9][0-9]{0,6}$/.test(context || "") && validContext(Number(context)) ? Number(context) : null);
+        await output.forward(response.body, value => { usage = value; });
+        if (!keys.verify(auth.slice(7))) throw Error("The API key was revoked.");
+        output.stop();
         res.end();
       } else {
         const result = await (req.url === "/v1/embeddings" ? api.models.embeddings(input, signal) : api.models.chat(input, signal)); signal.throwIfAborted();
@@ -96,8 +100,13 @@ function createLocalApi({ api, keys, onError = () => {} }) {
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify(result));
       }
       keys.recordUsage(key.id, { inTok: usage?.prompt_tokens || 0, outTok: usage?.completion_tokens || 0, costMicro: 0 });
-    } catch (error) { if (!res.writableEnded && !res.destroyed) fail(res, 503, controller.signal.aborted ? "Request stopped." : "The local model is unavailable."); onError(error); }
-    finally { pending.delete(controller); res.off("close", cancel); }
+    } catch (error) {
+      if (deadline?.aborted && !controller.signal.aborted && !api.signal.aborted)
+        fail(res, 504, "The local model exceeded the request time limit. No request was retried.", { source: "remote_access", code: "request_timeout" });
+      else fail(res, 503, controller.signal.aborted ? "Request stopped." : "The local model is unavailable.");
+      onError(error);
+    }
+    finally { output?.stop(); pending.delete(controller); res.off("close", cancel); }
   }
   return {
     models,
